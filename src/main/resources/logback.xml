@@ -1,0 +1,27 @@
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <timeZone>UTC</timeZone>
+            <timestampPattern>yyyy-MM-dd HH:mm:ss.SSS</timestampPattern>
+            <customFields>{"service":"exercise"}</customFields>
+            <fieldNames>
+                <levelValue>[ignore]</levelValue>
+                <logger>logger</logger>
+                <thread>[ignore]</thread>
+                <version>[ignore]</version>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="STDOUT" />
+    </appender>
+
+    <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook"/>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNCSTDOUT" />
+    </root>
+
+</configuration>
