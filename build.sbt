@@ -15,9 +15,12 @@ lazy val root = (project in file("."))
         Dependencies.Compile.playJsonDerivedCodecs,
         Dependencies.Compile.logStashEncoder,
         Dependencies.Compile.logback,
+        Dependencies.Compile.catsEffect,
+        Dependencies.Compile.catsLawEffect,
         Dependencies.Test.scalaTest,
         Dependencies.Test.scalaTestPlays,
-        Dependencies.Test.scalaMock
+        Dependencies.Test.scalaMock,
+        Dependencies.Test.akkaActorTypedTestKit
       ),
     resolvers += Dependencies.Compile.confluentReleases,
     routesImport := Seq(),

@@ -1,9 +1,14 @@
 # myraindrop-exercise
 
+## Requirements:
+
+ - sbt
+ - Java 11
+
 ## Run the service
 
 ```shell
-sbt run start
+sbt start
 ```
 
 ## Development build

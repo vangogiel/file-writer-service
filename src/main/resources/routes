@@ -1,1 +1,2 @@
 GET     /health                     myraindrop.exercise.controller.HealthController.default()
+POST    /api/server/create          myraindrop.exercise.controller.FileController.postCreateFile()
