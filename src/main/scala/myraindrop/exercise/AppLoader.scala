@@ -1,6 +1,10 @@
 package myraindrop.exercise
 
+import akka.actor.typed.ActorRef
+import akka.actor.typed.scaladsl.adapter.ClassicActorSystemOps
+import akka.util.Timeout
 import com.softwaremill.macwire.wire
+import myraindrop.exercise.actor.RequestsRateLimitingActor
 import myraindrop.exercise.api.RequestBodyParser
 import myraindrop.exercise.controller.{ FileController, HealthController }
 import myraindrop.exercise.logger.{ AppLogger, TypedLogger }
@@ -8,14 +12,24 @@ import play.api.routing.Router
 import play.api.{ Application, ApplicationLoader, BuiltInComponentsFromContext, NoHttpFiltersComponents }
 import router.Routes
 
+import scala.collection.immutable.Map
+import scala.concurrent.duration.DurationInt
+
 case class AppComponents(context: ApplicationLoader.Context)
     extends BuiltInComponentsFromContext(context)
     with NoHttpFiltersComponents
     with controllers.AssetsComponents {
+  implicit val typedSystem: akka.actor.typed.ActorSystem[Nothing] = actorSystem.toTyped
+  implicit val timeout: Timeout = Timeout(5.seconds)
+
   val logger: TypedLogger = new AppLogger
+
+  val requestsRateActor: ActorRef[RequestsRateLimitingActor.Command] =
+    actorSystem.spawn(RequestsRateLimitingActor.apply(Map()), "requests-rate-actor")
+
   val prefix: String = "/"
   lazy val requestBodyParser: RequestBodyParser = wire[RequestBodyParser]
-  lazy val healthController: HealthController = wire[HealthController]
+  lazy val healthCosntroller: HealthController = wire[HealthController]
   lazy val fileController: FileController = wire[FileController]
   override def router: Router = wire[Routes]
 }
