@@ -10,6 +10,7 @@ case class Resource(var timeOfReceivingLatestRequest: Long, var numberOfRequests
 object RequestsRateLimitingActor {
   sealed trait Command
   case class RequestResource(requestId: String, sender: ActorRef[Response]) extends Command
+  case class RemoveComplete(requestId: String) extends Command
 
   sealed trait Response
   case class Allowed() extends Response
@@ -35,6 +36,8 @@ object RequestsRateLimitingActor {
             sender ! Allowed()
             apply(mapOfRequestsInProgress + (requestId -> Resource(System.currentTimeMillis(), 1)))
         }
+      case RemoveComplete(requestId) =>
+        apply(mapOfRequestsInProgress - requestId)
     }
   }
 }
