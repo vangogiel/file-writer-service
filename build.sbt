@@ -17,6 +17,7 @@ lazy val root = (project in file("."))
         Dependencies.Compile.logback,
         Dependencies.Compile.catsEffect,
         Dependencies.Compile.catsLawEffect,
+        Dependencies.Compile.akkaActor,
         Dependencies.Test.scalaTest,
         Dependencies.Test.scalaTestPlays,
         Dependencies.Test.scalaMock,

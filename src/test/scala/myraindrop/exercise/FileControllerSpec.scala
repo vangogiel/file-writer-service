@@ -6,13 +6,20 @@ import akka.actor.typed.scaladsl.Behaviors
 import myraindrop.exercise.actor.RequestsRateLimitingActor
 import myraindrop.exercise.api.{ CreateFileRequest, RequestBodyParser }
 import myraindrop.exercise.controller.FileController
-import myraindrop.exercise.logger.{ CreateFileRequestReceived, TestLogger }
+import myraindrop.exercise.logger.{
+  CreateFileRequestReceived,
+  FileFoundResponse,
+  FileIsBeingCreatedResponse,
+  TestLogger,
+  TooManyRequestsResponse
+}
+import myraindrop.exercise.service.FilesServiceActor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatest.wordspec.AnyWordSpecLike
 import play.api.http.Status.{ OK, TOO_MANY_REQUESTS }
 import play.api.test.FakeRequest
-import play.api.test.Helpers.{ status, stubBodyParser, stubControllerComponents }
+import play.api.test.Helpers.{ contentAsJson, status, stubBodyParser, stubControllerComponents }
 
 class FileControllerSpec extends ScalaTestWithActorTestKit with MockFactory with AnyWordSpecLike {
   val actorSystem: ActorTestKit = ActorTestKit()
@@ -22,41 +29,77 @@ class FileControllerSpec extends ScalaTestWithActorTestKit with MockFactory with
   val mockLogger: TestLogger = new TestLogger
   val mockRequestIdResponseAllowed = "mockRequestId1"
   val mockRequestIdResponseLimitReached = "mockRequestId2"
+  val mockRequestIdResponseFileBeingCreated = "mockRequestId3"
 
   "FileController" should {
     "respond with 200 upon valid create file attempt" in {
-      prepareBodyParserForRequest1
+      prepareBodyParserForRequestAllowed
 
       val fileController = buildController
       val result = fileController.postCreateFile() apply FakeRequest()
 
       status(result) mustBe OK
       mockLogger.containsA[CreateFileRequestReceived](_.requestId mustBe a[String])
+      mockLogger.containsA[FileFoundResponse](_.requestId mustBe a[String])
+    }
+
+    "respond with valid body content and file content upon valid attempt to retrieve content" in {
+      prepareBodyParserForRequestAllowed
+
+      val fileController = buildController
+      val result = fileController.postCreateFile() apply FakeRequest()
+
+      val content = contentAsJson(result)
+      (content \ "requestId").as[String] mustBe mockRequestIdResponseAllowed
+      (content \ "created").as[Boolean] mustBe true
+      (content \ "fileContent").as[String] mustBe "mockContent"
+      mockLogger.containsA[CreateFileRequestReceived](_.requestId mustBe a[String])
+      mockLogger.containsA[FileFoundResponse](_.requestId mustBe a[String])
+    }
+
+    "respond with valid body content and no file content upon valid create file attempt" in {
+      prepareBodyParserForRequestFileBeingCreated
+
+      val fileController = buildController
+      val result = fileController.postCreateFile() apply FakeRequest()
+
+      val content = contentAsJson(result)
+      (content \ "requestId").as[String] mustBe mockRequestIdResponseFileBeingCreated
+      (content \ "created").as[Boolean] mustBe false
+      !(content \ "fileContent").isDefined
+      mockLogger.containsA[CreateFileRequestReceived](_.requestId mustBe a[String])
+      mockLogger.containsA[FileIsBeingCreatedResponse](_.requestId mustBe a[String])
     }
 
     "respond with 429 upon valid create file attempt with requests limit reached" in {
-      prepareBodyParserForRequest2
+      prepareBodyParserForRequestLimitReached
 
       val fileController = buildController
       val result = fileController.postCreateFile() apply FakeRequest()
 
       status(result) mustBe TOO_MANY_REQUESTS
       mockLogger.containsA[CreateFileRequestReceived](_.requestId mustBe a[String])
+      mockLogger.containsA[TooManyRequestsResponse](_.requestId mustBe a[String])
     }
   }
 
   private def buildController = {
     new FileController(
       actorSystem.spawn(rateLimitingBehaviour()),
+      actorSystem.spawn(filesServiceBehaviour()),
       mockBodyParser,
       stubControllerComponents(),
       mockLogger
     )
   }
 
-  private def prepareBodyParserForRequest1 = prepareBodyParserForRequest(mockRequestIdResponseAllowed)
+  private def prepareBodyParserForRequestAllowed = prepareBodyParserForRequest(mockRequestIdResponseAllowed)
 
-  private def prepareBodyParserForRequest2 = prepareBodyParserForRequest(mockRequestIdResponseLimitReached)
+  private def prepareBodyParserForRequestLimitReached = prepareBodyParserForRequest(mockRequestIdResponseLimitReached)
+
+  private def prepareBodyParserForRequestFileBeingCreated = prepareBodyParserForRequest(
+    mockRequestIdResponseFileBeingCreated
+  )
 
   private def prepareBodyParserForRequest(requestId: String) =
     (() => mockBodyParser.parseCreateFileRequest())
@@ -65,11 +108,23 @@ class FileControllerSpec extends ScalaTestWithActorTestKit with MockFactory with
 
   private def rateLimitingBehaviour() = Behaviors.receiveMessage[RequestsRateLimitingActor.Command] {
     case RequestsRateLimitingActor.RequestResource(r, sender) =>
-      if (r == mockRequestIdResponseAllowed) {
+      if (r == mockRequestIdResponseAllowed || r == mockRequestIdResponseFileBeingCreated) {
         sender ! RequestsRateLimitingActor.Allowed()
         Behaviors.same
       } else {
         sender ! RequestsRateLimitingActor.LimitReached()
+        Behaviors.same
+      }
+    case _ => Behaviors.empty
+  }
+
+  private def filesServiceBehaviour() = Behaviors.receiveMessage[FilesServiceActor.Command] {
+    case FilesServiceActor.GetOrCreateFile(r, sender) =>
+      if (r == mockRequestIdResponseAllowed) {
+        sender ! FilesServiceActor.FileFound("mockContent")
+        Behaviors.same
+      } else {
+        sender ! FilesServiceActor.FileIsBeingCreated()
         Behaviors.same
       }
     case _ => Behaviors.empty
