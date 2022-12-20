@@ -3,7 +3,7 @@ package myraindrop.exercise.actor
 import akka.actor.ActorSystem
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import akka.util.Timeout
-import myraindrop.exercise.actor.RequestsRateLimitingActor.{ LimitReached, Allowed, RequestResource }
+import myraindrop.exercise.actor.RequestsRateLimitingActor.{ Allowed, LimitReached, RequestResource }
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.collection.immutable.Map

@@ -8,11 +8,13 @@ import myraindrop.exercise.actor.RequestsRateLimitingActor
 import myraindrop.exercise.api.RequestBodyParser
 import myraindrop.exercise.controller.{ FileController, HealthController }
 import myraindrop.exercise.logger.{ AppLogger, TypedLogger }
+import myraindrop.exercise.service.{ FilesAsyncFileCreator, FilesResource, FilesServiceActor }
 import play.api.routing.Router
 import play.api.{ Application, ApplicationLoader, BuiltInComponentsFromContext, NoHttpFiltersComponents }
 import router.Routes
 
 import scala.collection.immutable.Map
+import scala.collection.immutable.List
 import scala.concurrent.duration.DurationInt
 
 case class AppComponents(context: ApplicationLoader.Context)
@@ -22,14 +24,21 @@ case class AppComponents(context: ApplicationLoader.Context)
   implicit val typedSystem: akka.actor.typed.ActorSystem[Nothing] = actorSystem.toTyped
   implicit val timeout: Timeout = Timeout(5.seconds)
 
-  val logger: TypedLogger = new AppLogger
+  val logger: TypedLogger = wire[AppLogger]
+  val filesResource: FilesResource = wire[FilesResource]
+  val filesAsyncFileCreator: FilesAsyncFileCreator = wire[FilesAsyncFileCreator]
 
   val requestsRateActor: ActorRef[RequestsRateLimitingActor.Command] =
     actorSystem.spawn(RequestsRateLimitingActor.apply(Map()), "requests-rate-actor")
+  val filesServiceActor: ActorRef[FilesServiceActor.Command] =
+    actorSystem.spawn(
+      FilesServiceActor.apply(List(), filesResource, filesAsyncFileCreator, typedSystem)(typedSystem.executionContext),
+      "file-service-actor"
+    )
 
   val prefix: String = "/"
   lazy val requestBodyParser: RequestBodyParser = wire[RequestBodyParser]
-  lazy val healthCosntroller: HealthController = wire[HealthController]
+  lazy val healthController: HealthController = wire[HealthController]
   lazy val fileController: FileController = wire[FileController]
   override def router: Router = wire[Routes]
 }
