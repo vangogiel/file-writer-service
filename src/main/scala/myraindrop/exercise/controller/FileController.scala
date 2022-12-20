@@ -5,7 +5,7 @@ import akka.actor.typed.{ ActorRef, ActorSystem }
 import akka.util.Timeout
 import cats.effect.{ ContextShift, IO }
 import myraindrop.exercise.actor.RequestsRateLimitingActor
-import myraindrop.exercise.actor.RequestsRateLimitingActor.{ Allowed, LimitReached, RequestResource }
+import myraindrop.exercise.actor.RequestsRateLimitingActor.{ Allowed, LimitReached, RemoveComplete, RequestResource }
 import myraindrop.exercise.api.Errors.InternalError
 import myraindrop.exercise.api.{ CreateFileRequest, ErrorResponse, FileCreatedResponse, RequestBodyParser }
 import myraindrop.exercise.logger.LoggableError.Error
@@ -34,6 +34,7 @@ class FileController(
     val result = for {
       _ <- wrappedRatesActorAsk(requestId)
       result <- wrappedFilesServiceAsk(requestId)
+      _ <- wrappedRatesActorEvictComplete(requestId)
     } yield result
 
     result match {
@@ -60,6 +61,13 @@ class FileController(
       .unsafeRunSync() match {
       case Allowed()      => Right(Allowed)
       case LimitReached() => Left(LimitReached)
+    }
+  }
+
+  private def wrappedRatesActorEvictComplete(requestId: String) = {
+    IO(requestsRateActor ! RemoveComplete(requestId))
+      .unsafeRunSync() match {
+      case _ => Right(true)
     }
   }
 
