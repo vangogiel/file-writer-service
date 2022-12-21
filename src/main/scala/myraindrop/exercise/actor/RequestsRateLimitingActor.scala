@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.Behaviors
 
 import scala.collection.immutable.Map
 
-case class Resource(var timeOfReceivingLatestRequest: Long, var numberOfRequests: Int)
+case class Resource(var timeOfFirstRequest: Long, var numberOfRequests: Int)
 
 object RequestsRateLimitingActor {
   sealed trait Command
@@ -22,12 +22,12 @@ object RequestsRateLimitingActor {
         mapOfRequestsInProgress.get(requestId) match {
           case Some(resource) =>
             val timeNowMilliseconds = System.currentTimeMillis()
-            if (timeNowMilliseconds - resource.timeOfReceivingLatestRequest < 1000 && resource.numberOfRequests > 1) {
+            if (timeNowMilliseconds - resource.timeOfFirstRequest < 1000 && resource.numberOfRequests > 1) {
               sender ! LimitReached()
               Behaviors.same
-            } else if (timeNowMilliseconds - resource.timeOfReceivingLatestRequest < 1000) {
+            } else if (timeNowMilliseconds - resource.timeOfFirstRequest < 1000) {
               sender ! Allowed()
-              apply(mapOfRequestsInProgress + (requestId -> Resource(timeNowMilliseconds, 2)))
+              apply(mapOfRequestsInProgress + (requestId -> Resource(resource.timeOfFirstRequest, 2)))
             } else {
               sender ! Allowed()
               apply(mapOfRequestsInProgress + (requestId -> Resource(timeNowMilliseconds, 1)))
