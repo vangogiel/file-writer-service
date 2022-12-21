@@ -1,10 +1,11 @@
 package myraindrop.exercise
 
-import akka.actor.typed.ActorRef
+import akka.actor.typed.{ ActorRef, ActorSystem }
 import akka.actor.typed.scaladsl.adapter.ClassicActorSystemOps
 import akka.util.Timeout
 import com.softwaremill.macwire.wire
-import myraindrop.exercise.actor.RequestsRateLimitingActor
+import myraindrop.exercise.actor.RequestRateEvictionActor.StartScheduler
+import myraindrop.exercise.actor.{ RequestRateEvictionActor, RequestsRateLimitingActor }
 import myraindrop.exercise.api.RequestBodyParser
 import myraindrop.exercise.controller.{ FileController, HealthController }
 import myraindrop.exercise.logger.{ AppLogger, TypedLogger }
@@ -35,6 +36,12 @@ case class AppComponents(context: ApplicationLoader.Context)
       FilesServiceActor.apply(List(), filesResource, filesAsyncFileCreator, typedSystem)(typedSystem.executionContext),
       "file-service-actor"
     )
+  val requestRateEvictionActorActorRef: ActorRef[RequestRateEvictionActor.Command] =
+    ActorSystem(
+      RequestRateEvictionActor.apply(requestsRateActor),
+      "jwt-sessions-eviction-actor"
+    )
+  requestRateEvictionActorActorRef ! StartScheduler()
 
   val prefix: String = "/"
   lazy val requestBodyParser: RequestBodyParser = wire[RequestBodyParser]
