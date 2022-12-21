@@ -5,7 +5,7 @@ import akka.actor.typed.{ ActorRef, ActorSystem }
 import akka.util.Timeout
 import cats.effect.{ ContextShift, IO }
 import myraindrop.exercise.actor.RequestsRateLimitingActor
-import myraindrop.exercise.actor.RequestsRateLimitingActor.{ Allowed, LimitReached, RemoveComplete, RequestResource }
+import myraindrop.exercise.actor.RequestsRateLimitingActor.{ Allowed, LimitReached, RequestResource }
 import myraindrop.exercise.api.Errors.InternalError
 import myraindrop.exercise.api.{ CreateFileRequest, ErrorResponse, FileCreatedResponse, RequestBodyParser }
 import myraindrop.exercise.logger.LoggableError.Error
@@ -34,17 +34,19 @@ class FileController(
     val result = for {
       _ <- wrappedRatesActorAsk(requestId)
       result <- wrappedFilesServiceAsk(requestId)
-      _ <- wrappedRatesActorEvictComplete(requestId)
     } yield result
 
     result match {
       case Right(FileFound(contents)) =>
         log.info(FileFoundResponse(requestId))
         Future.successful(Ok(Json.toJson(FileCreatedResponse(requestId, created = true, Option(contents)))))
-      case Left(FileIsBeingCreated) =>
+      case Left(FileFound(contents)) =>
+        log.info(FileFoundResponse(requestId))
+        Future.successful(Ok(Json.toJson(FileCreatedResponse(requestId, created = true, Option(contents)))))
+      case Left(FileIsBeingCreated()) =>
         log.info(FileIsBeingCreatedResponse(requestId))
         Future.successful(Ok(Json.toJson(FileCreatedResponse(requestId, created = false, Option.empty))))
-      case Left(LimitReached) =>
+      case Left(LimitReached()) =>
         log.info(TooManyRequestsResponse(requestId))
         Future.successful(TooManyRequests)
       case Left(_) =>
@@ -59,15 +61,8 @@ class FileController(
         IO(requestsRateActor.ask[RequestsRateLimitingActor.Response](RequestResource(requestId, _)))
       )
       .unsafeRunSync() match {
-      case Allowed()      => Right(Allowed)
-      case LimitReached() => Left(LimitReached)
-    }
-  }
-
-  private def wrappedRatesActorEvictComplete(requestId: String) = {
-    IO(requestsRateActor ! RemoveComplete(requestId))
-      .unsafeRunSync() match {
-      case _ => Right(true)
+      case Allowed()      => Right(Allowed())
+      case LimitReached() => Left(LimitReached())
     }
   }
 
@@ -78,7 +73,7 @@ class FileController(
       )
       .unsafeRunSync() match {
       case FileFound(fileContents) => Right(FileFound(fileContents))
-      case FileIsBeingCreated()    => Left(FileIsBeingCreated)
+      case FileIsBeingCreated()    => Left(FileIsBeingCreated())
     }
   }
 

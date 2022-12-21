@@ -10,7 +10,7 @@ case class Resource(var timeOfFirstRequest: Long, var numberOfRequests: Int)
 object RequestsRateLimitingActor {
   sealed trait Command
   case class RequestResource(requestId: String, sender: ActorRef[Response]) extends Command
-  case class RemoveComplete(requestId: String) extends Command
+  case class RemoveComplete() extends Command
 
   sealed trait Response
   case class Allowed() extends Response
@@ -36,8 +36,10 @@ object RequestsRateLimitingActor {
             sender ! Allowed()
             apply(mapOfRequestsInProgress + (requestId -> Resource(System.currentTimeMillis(), 1)))
         }
-      case RemoveComplete(requestId) =>
-        apply(mapOfRequestsInProgress - requestId)
+      case RemoveComplete() =>
+        val timeNowMilliseconds = System.currentTimeMillis()
+        val incomplete = mapOfRequestsInProgress.filter(k => timeNowMilliseconds - k._2.timeOfFirstRequest < 1000)
+        apply(incomplete)
     }
   }
 }
