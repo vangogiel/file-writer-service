@@ -1,4 +1,8 @@
-# myraindrop-exercise
+# file-writer-service
+
+This is a microservice exposing an endpoint to allow thread-safe file creation upon a request.
+It presents a deliberately challenging case of a file that takes a reasonable couple of seconds to create.
+It prevents duplicates from beign created and manages get requests in a thread-safe way as well.
 
 ## Requirements:
 
