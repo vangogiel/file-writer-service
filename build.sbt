@@ -8,7 +8,7 @@ lazy val root = (project in file("."))
   .enablePlugins(PlayScala)
   .disablePlugins(PlayLayoutPlugin)
   .settings(
-    name := "myraindrop-exercise",
+    name := "file-writer-exercise",
     libraryDependencies ++=
       Seq(
         Dependencies.Provided.macwire,

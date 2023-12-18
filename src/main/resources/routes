@@ -1,2 +1,2 @@
-GET     /health                     myraindrop.exercise.controller.HealthController.default()
-POST    /api/server/create          myraindrop.exercise.controller.FileController.postCreateFile()
+GET     /health                     io.vangogiel.filewriter.exercise.controller.HealthController.default()
+POST    /api/server/create          io.vangogiel.filewriter.exercise.controller.FileController.postCreateFile()
